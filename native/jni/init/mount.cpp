@@ -155,6 +155,21 @@ void BaseInit::read_dt_fstab(vector<fstab_entry> &fstab) {
 void MagiskInit::mount_with_dt() {
     vector<fstab_entry> fstab;
     read_dt_fstab(fstab);
+	bool fake_slot = false;
+	for (const auto &entry : fstab) {
+		char check_entry[32]; 
+		sprintf(check_entry, "%s", basename(entry.dev.data()));
+		char entry_last_2[4];
+		entry_last_2[0] = check_entry[strlen(check_entry)-2];
+		entry_last_2[1] = check_entry[strlen(check_entry)-1];
+		entry_last_2[2] = check_entry[strlen(check_entry)];
+		char slot_a_str[4] = "_a";
+		if (strcasecmp(entry_last_2, slot_a_str) == 0) {
+			LOGD("Fake slot detected!\n");
+			fake_slot = true;
+			break;
+		}
+	}
     for (const auto &entry : fstab) {
         if (is_lnk(entry.mnt_point.data()))
             continue;
@@ -164,7 +179,12 @@ void MagiskInit::mount_with_dt() {
             continue;
         }
         // Derive partname from dev
-        sprintf(blk_info.partname, "%s%s", basename(entry.dev.data()), config->slot);
+        if (fake_slot) {
+			sprintf(blk_info.partname, "%s", basename(entry.dev.data()));
+		}
+		else {
+			sprintf(blk_info.partname, "%s%s", basename(entry.dev.data()), config->slot);
+		}
         setup_block(true);
         xmkdir(entry.mnt_point.data(), 0755);
         xmount(blk_info.block_dev, entry.mnt_point.data(), entry.type.data(), MS_RDONLY, nullptr);
